@@ -1,38 +1,49 @@
 import { View, Text, Image, StyleSheet } from "react-native";
 import React from "react";
 import { TouchableOpacity } from "react-native-gesture-handler";
-const ItemHome = ({ imageSource, textContent, price, description, navigation } : any) => {
+
+const formatCurrency = (price) => {
+    return new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: "VND",
+    }).format(price);
+};
+
+const ItemHome = ({ imageSource, textContent, price, description, discount, navigation, specialPrice }) => {
     return (
-        <TouchableOpacity style={styles.orderItem} onPress={() => navigation.navigate('Details')}>
+        <TouchableOpacity style={styles.orderItem}>
             <View style={styles.img}>
                 <Image source={{ uri: imageSource }} style={styles.orderImage} />
+                {discount > 0 ? (
+                    <View style={styles.discountBadge}>
+                        <Text style={styles.discountText}>-{discount}%</Text>
+                    </View>
+                ) :
+                    <View style={styles.discountBadge}>
+                        <Text style={styles.discountText}>NEW</Text>
+                    </View>
+                    }
             </View>
             <View style={styles.item_detail}>
                 <View style={styles.orderDetails}>
                     <Text style={styles.orderName}>{textContent}</Text>
-                    <Text style={styles.space}>..............................</Text>
-                    <Text style={styles.orderPrice}>{price}</Text>
+                    {discount > 0 ?
+                        <Text style={styles.orderPrice}>{formatCurrency(specialPrice)}</Text>
+                        : <Text style={styles.orderPrice}>{formatCurrency(price)}</Text>
+                    }
                 </View>
                 <View style={styles.orderAction}>
                     <Text style={styles.orderDescription}>{description}</Text>
                     <TouchableOpacity style={styles.orderButton} onPress={() => { }}>
-                        <Text style={styles.orderButtonText}>Add cart</Text>
+                        <Text style={styles.orderButtonText}>Thêm</Text>
                     </TouchableOpacity>
                 </View>
             </View>
         </TouchableOpacity>
     );
 };
+
 const styles = StyleSheet.create({
-    ItemStyle: {
-        height: 164,
-        width: 154,
-        backgroundColor: "#FFF",
-        borderRadius: 15,
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 20,
-    },
     orderItem: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -44,6 +55,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 5,
         elevation: 3,
+        height: 100
     },
     img: {
         flex: 1,
@@ -59,7 +71,6 @@ const styles = StyleSheet.create({
         width: 50,
         height: 50,
         borderRadius: 25,
-
     },
     orderDetails: {
         flex: 1,
@@ -70,12 +81,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginRight: 5
     },
-    space: {
-        flex: 2,
-        marginLeft: 0,
-        marginRight: 20,
-    },
-
     orderAction: {
         flex: 1,
         flexDirection: 'row',
@@ -85,6 +90,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginBottom: 5,
         flex: 1,
+        textAlign: 'right'
     },
     orderDescription: {
         flex: 3,
@@ -102,5 +108,20 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         margin: 5
     },
+    discountBadge: {
+        position: 'absolute',
+        top: -20,
+        left: 5,
+        backgroundColor: '#ff3e3e',
+        borderRadius: 5,
+        paddingVertical: 2,
+        paddingHorizontal: 5,
+    },
+    discountText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 10,
+    },
 });
+
 export default ItemHome;

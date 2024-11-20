@@ -1,46 +1,113 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, Button, ScrollView, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Image, Button, ScrollView, FlatList, StyleSheet, TouchableOpacity, TouchableHighlight } from 'react-native';
 import Swiper from 'react-native-swiper';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { GET_ALL, GET_IMG } from '../../api/apiService'
+import { GET_ALL, GET_ID, GET_IMG, ProductByCategory } from '../../api/apiService'
 import ItemHome from './items/ItemProduct';
+import { useNavigation } from 'expo-router';
+import { useRoute } from '@react-navigation/native';
 
 
-const Feed = ({ navigation }: { navigation: any }) => {
+const Feed = ({ navigation, route }: any) => {
     const [coffeeData, setCoffeeData] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [categoryId, setCategoryId] = useState({});
+    const [categoryName, setCategoryName] = useState('');
+    const [products, setProducts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    console.log("CategoryId:", categoryId);
+
     useEffect(() => {
-        GET_ALL("products")
-            .then((response) => {
-                if (response && response.data && Array.isArray(response.data.content)) {
-                    setCoffeeData(response.data.content);
+        const fetchProducts = async () => {
+            try {
+                const response = await GET_ALL("products");
+                console.log("API response:", response); // Kiểm tra phản hồi API
+
+                if (response && Array.isArray(response.content)) {
+                    setProducts(response.content);
                 } else {
-                    console.error(
-                        "Data received from the API is not in a supported format."
-                    );
+                    console.error("Unexpected response format:", response);
                 }
+                if (categoryId) {
+                    const response = await ProductByCategory(categoryId);
+                    console.log("Product By Category:", response);
+
+                    if (response && Array.isArray(response.content)) {
+                        setProducts(response.content);
+                    } else {
+                        console.error("Unexpected response format:", response);
+                    }
+                }
+
+            } catch (error) {
+                console.error("Failed to fetch products:", error);
+            } finally {
                 setIsLoading(false);
-            })
-            .catch((error) => {
-                console.error("Error fetching data: ", error);
+            }
+        };
+
+        fetchProducts();
+    }, [categoryId]);
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const response = await GET_ALL("categories?pageNumber=0&pageSize=10&sortBy=categoryId&sortOrder=asc");
+                console.log("API response:", response);
+                if (response && Array.isArray(response.content)) {
+                    setCategories(response.content);
+                } else {
+                    console.error("Unexpected response format:", response);
+                }
+            } catch (error) {
+                console.error("Failed to fetch categories:", error);
+            } finally {
                 setIsLoading(false);
-            });
+            }
+        };
+
+        fetchCategories();
     }, []);
+
+    const [username, setUserName] = useState('');
+    const email = localStorage.getItem("email");
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const response = await GET_ID("users/email", email);
+                console.log("API response:", response);
+                setUserName(response.lastName);
+                if (response && Array.isArray(response.content)) {
+                    setUserName(response.content);
+                } else {
+                    console.error("Unexpected response format:", response);
+                }
+            } catch (error) {
+                console.error("Failed to fetch products:", error);
+            }
+        };
+        fetchUser();
+    }, [email]);
+    const handleCategory = (categories) => {
+        setCategoryId(categories.categoryId);
+        setCategoryName(categories.categoryName);
+    }
+
     const [swiperIndex, setSwiperIndex] = useState(0);
     return (
         <>
             <ScrollView style={styles.container}>
                 {/* Header Section */}
                 <View style={styles.header}>
-                    <Text style={styles.greeting}>Hello, Admin</Text>
+                    <Text style={styles.greeting}>Hello, {username}</Text>
                     <View style={styles.header_bottom}>
                         <View style={styles.header_option1}>
                             <Image source={require('../../../assets/images/banner/Logo 1.png')} style={styles.logo} />
                         </View>
                         <View style={styles.header_option2}>
-                            <FontAwesome name="search" size={20} color="background: #9A7D60" style={styles.header_icon} />
+                            <FontAwesome name="search" size={20} color="background: #9A7D60" style={styles.header_icon} onPress={() => navigation.navigate("Search")} />
                             <Ionicons name="language-sharp" size={24} color="background: #9A7D60" style={styles.header_icon} />
                         </View>
                     </View>
@@ -56,23 +123,24 @@ const Feed = ({ navigation }: { navigation: any }) => {
                         onIndexChanged={(index) => setSwiperIndex(index)}
                     >
                         {/* Offers and Rewards Section */}
-                        <View style={styles.section}>
+                        <View style={styles.section}>   
                             <View style={styles.section_banner}>
-                                <Text style={styles.sectionTitle}>Offers and Rewards</Text>
-                                <Text style={styles.sectionText}>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</Text>
-                                <TouchableOpacity style={styles.button} onPress={() => { }}>
-                                    <Text style={styles.buttonText}>View Offers</Text>
-                                </TouchableOpacity>
+                                <Text style={styles.sectionTitle}>Decaf Coffee</Text>
+                                <Text style={styles.sectionText}>Chúng ta xứng đáng thưởng thức những ly cà phê ngon bắt 
+                                    đầu từ việc tạo ra những khác biệt tích cực cho thế giới.</Text>
+                                <View style={styles.button}>
+                                    <Text style={styles.buttonText}>Xem thêm</Text>
+                                </View>
                             </View>
                             <Image source={require('../../../assets/images/banner/Slider Image.png')} style={styles.section_banner_img} />
                         </View>
                         <View style={styles.section}>
                             <View style={styles.section_banner}>
-                                <Text style={styles.sectionTitle}>Offers and Rewards</Text>
-                                <Text style={styles.sectionText}>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</Text>
-                                <TouchableOpacity style={styles.button} onPress={() => { }}>
-                                    <Text style={styles.buttonText}>View Offers</Text>
-                                </TouchableOpacity>
+                                <Text style={styles.sectionTitle}>Cà phê Latte</Text>
+                                <Text style={styles.sectionText}>Béo ngậy, mịn màng và dễ thưởng thức, chúng tôi có công thức Latte dành riêng cho bạn.</Text>
+                                <View style={styles.button}>
+                                    <Text style={styles.buttonText}>Xem thêm</Text>
+                                </View>
                             </View>
                             <Image source={require('../../../assets/images/banner/Slider Image (1).png')} style={styles.section_banner_img} />
                         </View>
@@ -84,54 +152,46 @@ const Feed = ({ navigation }: { navigation: any }) => {
                 <View style={styles.category}>
                     <ScrollView horizontal={true}>
                         <View style={styles.category_container}>
-                            <View style={styles.category_item}>
-                                <TouchableOpacity style={styles.btn_category}>
-                                    <Image source={require('../../../assets/images/product/Group 1190 (1).png')} style={styles.categoryImage} />
-                                    <Text style={styles.text_category}>Hot Cafe</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.category_item}>
-                                <TouchableOpacity style={styles.btn_category}>
-                                    <Image source={require('../../../assets/images/product/fe81735c-bae9-4021-9e68-65ea2ec59efd.png')} style={styles.categoryImage} />
-                                    <Text style={styles.text_category}>Cold Cafe</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.category_item}>
-                                <TouchableOpacity style={styles.btn_category}>
-                                    <Image source={require('../../../assets/images/product/Croissant (1).png')} style={styles.categoryImage} />
-                                    <Text style={styles.text_category}>Sweet Cake</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.category_item}>
-                                <TouchableOpacity style={styles.btn_category}>
-                                    <Image source={require('../../../assets/images/product/1047c157-189e-4c83-b591-7f00653ae2ec.png')} style={styles.categoryImage} />
-                                    <Text style={styles.text_category}>Ice tea</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.category_item}>
-                                <TouchableOpacity style={styles.btn_category}>
-                                    <Image source={require('../../../assets/images/product/d12193e1-235b-4768-a904-63341fe8db49.png')} style={styles.categoryImage} />
-                                    <Text style={styles.text_category}>Hot tea</Text>
-                                </TouchableOpacity>
-                            </View>
+                            {
+                                isLoading ?
+                                    <Text>Loading....</Text> :
+                                    categories.map((item) => (
+                                        <View style={styles.category_item} >
+                                            <TouchableOpacity style={styles.btn_category} onPress={() => handleCategory(item)}>
+                                                <Text style={styles.text_category}>{item.categoryName}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))
+                            }
                         </View>
                     </ScrollView>
                 </View>
 
-                {/* Recent Orders Section */}
                 <View style={styles.recentOrdersSection}>
-                    <Text style={styles.recentOrdersTitle}>Recent Orders</Text>
+                    {
+                        categoryId ? <Text style={styles.recentOrdersTitle}>{categoryName}</Text> : <Text style={styles.recentOrdersTitle}>Đồ uống</Text>
+                    }
                     {isLoading ? (
                         <Text>Loading...</Text>
-                    ) : (coffeeData.map((coffee, index) => (
-                        <ItemHome
-                            key={index}
-                            imageSource={GET_IMG("products", coffee.photo)}
-                            textContent={coffee.title}
-                            price = {coffee.price}
-                            description = {coffee.description}
-                        />
-                    ))
+                    ) : (
+                        products.map((product) => (
+                            <TouchableHighlight
+                                // key={product.product_id}
+                                style={{ marginBottom: 20, borderRadius: 15 }}
+                                onPress={() => {
+                                    navigation.navigate("Details", { product: product });
+                                }}
+                            >
+                                <ItemHome
+                                    imageSource={GET_IMG("products/image", product.image)}
+                                    textContent={product.productName}
+                                    price={product.price}
+                                    description={product.description}
+                                    discount={product.discount}
+                                    specialPrice={product.specialPrice}
+                                />
+                            </TouchableHighlight>
+                        ))
                     )}
                 </View>
             </ScrollView>
@@ -339,7 +399,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     category: {
-        height: 100,
+        height: 50,
     },
 
     bottomNavigation: {

@@ -1,36 +1,76 @@
 import { Dimensions, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Image, TouchableOpacity, ScrollView } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Fontisto from '@expo/vector-icons/Fontisto';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { SwipeListView } from 'react-native-swipe-list-view';
+import { GET_IMG, REMOVEFROMCART } from '../api/apiService';
+import { v4 as uuidv4 } from 'uuid';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
+const Cart = ({ navigation, route }: any) => {
 
-const Cart = ({ navigation }: { navigation: any }) => {
-    // Cart items array with quantity
-    const [cartItems, setCartItems] = useState([
-        { id: 1, name: 'Espresso', size: 'Small', milk: '2%', shots: 2, quantity: 1 },
-        { id: 2, name: 'Croissant', size: 'Large', milk: 'Whole', shots: 1, quantity: 1 },
-    ]);
+    const [products, setProducts] = useState([]);
 
-    // Increase quantity of specific cart item
-    const handleIncrease = (index: number) => {
-        const updatedItems = [...cartItems];
-        updatedItems[index].quantity += 1;
-        setCartItems(updatedItems);
-    };
 
-    // Decrease quantity of specific cart item
-    const handleDecrease = (index: number) => {
-        const updatedItems = [...cartItems];
-        if (updatedItems[index].quantity > 1) {
-            updatedItems[index].quantity -= 1;
+    useEffect(() => {
+        const loadCart = async () => {
+            try {
+                const storedCart = await AsyncStorage.getItem('cart')
+                if (storedCart) {
+                    setProducts(JSON.parse(storedCart))
+                }
+            } catch (error) {
+                console.error('Error loading cart data from AsyncStorage', error)
+            }
         }
-        setCartItems(updatedItems);
+        loadCart()
+    }, [])
+
+    // Save cart data to AsyncStorage whenever products array changes
+    useEffect(() => {
+        const saveCart = async () => {
+            try {
+                await AsyncStorage.setItem('cart', JSON.stringify(products))
+            } catch (error) {
+                console.error('Error saving cart data to AsyncStorage', error)
+            }
+        }
+        saveCart()
+    }, [products])
+
+    // Handle deleting a product from the cart
+    const handleDeleteProduct = async (index: number, productId: number) => {
+        try {
+            const cartId = await AsyncStorage.getItem('cartId');
+            if (cartId) {
+                console.log("card Id: ", cartId);
+            }
+            await REMOVEFROMCART(cartId, productId);
+
+            setProducts((prevData) => prevData.filter((_, i) => i !== index));
+        } catch (error) {
+            console.error("Error deleting product from the cart:", error)
+        }
+    }
+
+    // Navigate to the payment screen
+    const handleNext = () => {
+        navigation.navigate('Payment', { products: products })
+    }
+    const formatCurrency = (price) => {
+        return new Intl.NumberFormat("vi-VN", {
+            style: "currency",
+            currency: "VND",
+        }).format(price);
     };
+
+    // Calculate the total price of the cart
+    const totalSum = products.reduce((sum, item) => sum + item.totalPrice, 0)
 
     return (
         <>
@@ -42,8 +82,8 @@ const Cart = ({ navigation }: { navigation: any }) => {
                             <Image source={require('../../assets/images/banner/Logo 1.png')} style={styles.logo} />
                         </View>
                         <View style={styles.header_option2}>
-                        <FontAwesome name="search" size={20} color="background: #9A7D60" style={styles.header_icon}  />
-                        <Ionicons name="language-sharp" size={24} color="background: #9A7D60" style={styles.header_icon}  />
+                            <FontAwesome name="search" size={20} color="background: #9A7D60" style={styles.header_icon} />
+                            <Ionicons name="language-sharp" size={24} color="background: #9A7D60" style={styles.header_icon} />
                         </View>
                     </View>
 
@@ -52,7 +92,7 @@ const Cart = ({ navigation }: { navigation: any }) => {
                             <AntDesign name="arrowleft" size={24} color="black" />
                         </TouchableOpacity>
                         <View style={styles.page_title}>
-                            <Text style={styles.txt_title}>Your Order</Text>
+                            <Text style={styles.txt_title}>Giỏ hàng</Text>
                         </View>
                         <TouchableOpacity style={{ marginRight: 10 }} onPress={() => navigation.goBack()}>
                             <Fontisto name="save" size={24} color="#4a2306" />
@@ -60,50 +100,55 @@ const Cart = ({ navigation }: { navigation: any }) => {
                     </View>
 
                     {/* Cart Items */}
-                    <View style={styles.cart_container}>
-                        {cartItems.map((item, index) => (
-                            <View key={item.id} style={styles.cart_item}>
+                    <SwipeListView
+                        data={products}
+                        renderItem={(data, rowMap) => (
+                            <View style={styles.cart_item}>
                                 <View style={styles.cart_item_img}>
-                                    <Image source={require('../../assets/images/product/Croissant (1).png')} />
+                                    <Image
+                                        source={{ uri: GET_IMG("products/image", data.item.image) }}
+                                        style={styles.image}
+                                        resizeMode="contain"
+                                    />
                                 </View>
+
                                 <View style={styles.cart_item_info}>
-                                    <Text style={styles.cart_item_name}>{item.name}</Text>
-                                    <Text style={styles.cart_item_select}>Size: {item.size}</Text>
-                                    <Text style={styles.cart_item_select}>Milk: {item.milk}</Text>
-                                    <Text style={styles.cart_item_select}>Espresso shots: {item.shots}</Text>
+                                    <Text style={styles.cart_item_name}>{data.item.productName}</Text>
+                                    <Text style={styles.cart_item_select}>Kích cỡ: {data.item.selectedSize}</Text>
+                                    <Text style={styles.cart_item_select}>x {data.item.quantity}</Text>
                                 </View>
 
                                 <View style={styles.cart_item_action}>
                                     <View style={styles.action}>
-                                        <TouchableOpacity>
-                                            <FontAwesome name="trash-o" size={20} color="#4a2306" style={styles.row}/>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity>
-                                            <FontAwesome5 name="pen" size={20} color="#4a2306" style={styles.row}/>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View style={styles.quantity}>
-                                        <TouchableOpacity onPress={() => handleDecrease(index)}>
-                                            <AntDesign name="minuscircleo" size={20} color="#4a2306" style={styles.btn_quantity} />
-                                        </TouchableOpacity>
-                                        <Text style={styles.txt_quantity}>{item.quantity}</Text>
-                                        <TouchableOpacity onPress={() => handleIncrease(index)}>
-                                            <AntDesign name="pluscircleo" size={20} color="#4a2306" style={styles.btn_quantity} />
-                                        </TouchableOpacity>
+                                        <Text style={{ fontSize: 15, fontWeight: 'bold' }}>Giá:{formatCurrency(data.item.total)}</Text>
                                     </View>
                                 </View>
                             </View>
-                        ))}
-                    </View>
+                        )}
+                        renderHiddenItem={(data, rowMap) => (
+                            <TouchableOpacity
+                                style={styles.rightAction}
+                                onPress={() => handleDeleteProduct(data.index, data.item.productId)}>
+                                <View style={styles.BTNrightAction}>
+                                    <FontAwesome name="trash" size={26} color="#dd0c0c" />
+                                </View>
+                            </TouchableOpacity>
+                        )}
+                        rightOpenValue={-75}
+                        keyExtractor={(item) => item.key}
+                    />
+
 
                     <View style={styles.note}>
                         <textarea style={styles.note_container} />
-                        <Text style={styles.note_title}>Your note</Text>
+                        <Text style={styles.note_title}>Ghi chú</Text>
                     </View>
                 </ScrollView>
             </View>
-            <TouchableOpacity style={styles.payment} onPress={() => navigation.navigate('Payment')}>
-                <Text style={styles.btn_payment}> Continue</Text>
+            <TouchableOpacity style={styles.payment} onPress={handleNext}>
+                <Text style={styles.btn_payment}> Tiếp tục &nbsp;&nbsp;&nbsp;
+                    <Text style={{ color: 'white' }}>{formatCurrency(totalSum)}</Text>
+                </Text>
             </TouchableOpacity></>
     );
 };
@@ -164,6 +209,15 @@ const styles = StyleSheet.create({
         marginVertical: 20,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#fff',
+        padding: 15,
+        borderRadius: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+        position: 'relative',
     },
     cart_item_img: {
         flex: 1,
@@ -174,6 +228,7 @@ const styles = StyleSheet.create({
     },
     cart_item_action: {
         flex: 1,
+        marginRight: 15
     },
     cart_item_name: {
         color: '#4a2306',
@@ -250,5 +305,40 @@ const styles = StyleSheet.create({
         shadowRadius: 3.84,
 
         elevation: 5,
-    }
+    },
+    rightAction: {
+        position: 'absolute', // Allow the delete button to overlay the item
+        right: 0,
+        top: 0,
+        bottom: 0,
+        backgroundColor: '#d2571e',
+        justifyContent: 'center',
+        alignItems: 'flex-end',
+        paddingRight: 15,
+        width: '75%',
+        borderRadius: 10,
+        marginHorizontal: 12,
+        marginVertical: 22,
+    },
+    BTNrightAction: {
+        backgroundColor: '#fff',
+        padding: 10,
+        borderRadius: 30,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    trashIcon: {
+        color: '#dd0c0c',  // Keep the icon color consistent
+        fontSize: 26,  // Increase the icon size
+    },
+    image: {
+        width: 50, // Adjust based on your layout
+        height: 50, // Adjust based on your layout
+        borderRadius: 5, // Optional: to give it rounded corners
+        marginBottom: 10, // Optional: spacing below the image
+        marginRight: 15
+    },
 });

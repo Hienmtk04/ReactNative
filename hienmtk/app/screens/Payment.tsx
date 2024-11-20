@@ -1,58 +1,125 @@
-import { Dimensions, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Dimensions, Modal, Platform, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native'
 import React, { useMemo, useState } from 'react'
 import { Image, TouchableOpacity, ScrollView } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Fontisto from '@expo/vector-icons/Fontisto';
-import RadioGroup, { RadioButtonProps } from 'react-native-radio-buttons-group';
+import RadioGroup, { RadioButton, RadioButtonProps } from 'react-native-radio-buttons-group';
 import { FlatList } from 'react-native-gesture-handler';
+import { router } from 'expo-router';
+import { ADD_ORDER, GET_IMG } from '../api/apiService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import paypalApi from '../api/paypalApi';
+import { WebView } from 'react-native-webview';
+import * as Linking from 'expo-linking';
+import queryString from 'query-string';
 
-const Payment = ({ navigation }: { navigation: any }) => {
+const Payment = ({ navigation, route }: any) => {
     // Cart items array with quantity
-    const [tip, setTip] = useState(2);
-    const [paymentMethod, setPaymentMethod] = useState('Visa');
+    const [tip, setTip] = useState(0);
+    const [paymentMethod, setPaymentMethod] = useState('PAYPAL');
+    const [product, setProduct] = useState([]);
+    const [paypalUrl, setPaypalUrl] = useState(null);
+    const [accessToken, setAccessToken] = useState(null);
 
-    const orderItems = [
-        {
-            id: 1,
-            name: 'Espresso',
-            size: 'Small',
-            milk: '2%',
-            topping: 'Cinnamon',
-            shots: '2',
-            price: '4$',
-            image: require('../../assets/images/product/Croissant (2).png'), // Replace with your image path
-        },
-        {
-            id: 2,
-            name: 'Bacon, Sausage & Egg Wrap',
-            size: 'Half',
-            ketchup: '1',
-            price: '5$',
-            image: require('../../assets/images/product/Croissant (3).png'), // Replace with your image path
-        },
+
+    const { products } = route.params;
+    const totalSum = products.reduce((sum, item) => sum + item.total, 0);
+    const totalMoney = tip + totalSum;
+    console.log("Payment Method: ", paymentMethod)
+
+    const radioButtons = [
+        { id: '1', label: 'PayPal', value: 'PAYPAL' },
+        { id: '2', label: 'Tiền mặt', value: 'CASH' }
     ];
 
-    const radioButtons: RadioButtonProps[] = useMemo(() => ([
-        {
-            id: '1', 
-            label: 'Visa *5512',
-            value: 'visa'
-        },
-        {
-            id: '2',
-            label: 'ATM',
-            value: 'atm'
-        },
-        {
-            id: '3',
-            label: 'Cash money',
-            value: 'cash'
-        }
-    ]), []);
+    const handlePayment = async () => {
+        try {
+            const cartId = await AsyncStorage.getItem('cartId');
+            const emailId = await AsyncStorage.getItem('email');
+            if (!cartId) {
+                console.error("Cart ID not found in AsyncStorage");
+                return;
+            }
+            const response = await ADD_ORDER(emailId, cartId, paymentMethod);
+            if (response) {
+                console.log("Add order successfully");
+            }
+            navigation.navigate("Success");
+            await AsyncStorage.setItem("cart", JSON.stringify([]));
 
-    const [selectedId, setSelectedId] = useState<string | undefined>();
+        } catch (error) {
+            console.error("Error clearing cart: ", error);
+        }
+    };
+    const formatCurrency = (price) => {
+        return new Intl.NumberFormat("vi-VN", {
+            style: "currency",
+            currency: "VND",
+        }).format(price);
+    };
+
+    const onPressPaypal = async () => {
+        try {
+            const token = await paypalApi.generateToken();
+            const res = await paypalApi.CreateOrder(token);
+            setAccessToken(token);
+            if (!!res?.links) {
+                const findUrl = res.links.find(data => data?.rel === "approve");
+                if (findUrl) {
+                    setPaypalUrl(findUrl.href);
+                    await Linking.openURL(findUrl.href);
+                }
+            }
+        } catch (error) {
+            console.error("Error with PayPal URL: ", error);
+        }
+    };
+
+
+    const onChangeUrl = (webviewState) => {
+        console.log("webviewState", webviewState);
+        if (webviewState.url.includes('myapp://payment/cancle')) {
+            clearPaypalState();
+            alert("Đóng"); 
+            return;
+        }
+        if (webviewState.url.includes('myapp://payment/success')) {
+            const urlValue = queryString.parseUrl(webviewState.url);
+            console.log("my url value: ", urlValue);
+            const token = urlValue.query;
+            if (!!token) {
+                paymentSuccess(token);
+            }
+        }
+
+    };
+
+    const clearPaypalState = () => {
+        setPaypalUrl(null);
+        setAccessToken(null);
+    }
+
+    const paymentSuccess = async (id) => {
+        try {
+            const res = paypalApi.capturePayment(id, accessToken);
+            console.log("capturePayment ress: ", res)
+            alert("Thanh toán thành công!");
+            clearPaypalState();
+        } catch (error) {
+            console.log("error payment capture: ", error)
+        }
+    }
+
+
+    const handleSetPayment = (item) => {
+        setPaymentMethod(item.value);
+        if (item.value === "PAYPAL") {
+            onPressPaypal();
+        }
+    };
+
     return (
         <>
             <View style={styles.container}>
@@ -63,8 +130,8 @@ const Payment = ({ navigation }: { navigation: any }) => {
                             <Image source={require('../../assets/images/banner/Logo 1.png')} style={styles.logo} />
                         </View>
                         <View style={styles.header_option2}>
-                        <FontAwesome name="search" size={20} color="background: #9A7D60" style={styles.header_icon}  />
-                        <Ionicons name="language-sharp" size={24} color="background: #9A7D60" style={styles.header_icon}  />
+                            <FontAwesome name="search" size={20} color="background: #9A7D60" style={styles.header_icon} />
+                            <Ionicons name="language-sharp" size={24} color="background: #9A7D60" style={styles.header_icon} />
                         </View>
                     </View>
 
@@ -73,7 +140,7 @@ const Payment = ({ navigation }: { navigation: any }) => {
                             <AntDesign name="arrowleft" size={24} color="black" />
                         </TouchableOpacity>
                         <View style={styles.page_title}>
-                            <Text style={styles.txt_title}>Your Order</Text>
+                            <Text style={styles.txt_title}>Đơn hàng</Text>
                         </View>
                         <TouchableOpacity style={{ marginRight: 10 }} onPress={() => navigation.goBack()}>
                             <Fontisto name="save" size={24} color="#4a2306" />
@@ -82,19 +149,17 @@ const Payment = ({ navigation }: { navigation: any }) => {
 
                     {/* Order Items */}
                     <FlatList
-                        data={orderItems}
-                        keyExtractor={(item: any) => item.id.toString()}
+                        data={products}
+                        keyExtractor={(item: any) => item.id}
                         renderItem={({ item }: { item: any }) => (
                             <View style={styles.orderItem}>
-                                <Image source={item.image} style={styles.itemImage} />
+                                <Image source={{ uri: GET_IMG("products/image", item.image) }} style={styles.itemImage} />
                                 <View style={styles.itemInfo}>
-                                    <Text style={styles.itemName}>{item.name}</Text>
-                                    <Text style={styles.itemDetails}>Size: {item.size}</Text>
-                                    {item.milk && <Text style={styles.itemDetails}>Milk: {item.milk}</Text>}
-                                    {item.topping && <Text style={styles.itemDetails}>Topping: {item.topping}</Text>}
-                                    <Text style={styles.itemDetails}>Espresso shots: {item.shots || item.ketchup}</Text>
+                                    <Text style={styles.itemName}>{item.productName}</Text>
+                                    <Text style={styles.itemDetails}>Size: {item.selectedSize}</Text>
+                                    <Text style={styles.itemDetails}>x{item.quantity}</Text>
                                 </View>
-                                <Text style={styles.itemPrice}>Total: {item.price}</Text>
+                                <Text style={styles.itemPrice}>Tổng: {formatCurrency(item.total)}</Text>
                             </View>
                         )}
                     />
@@ -111,15 +176,15 @@ const Payment = ({ navigation }: { navigation: any }) => {
                     </View>
 
                     {/* Tip Section */}
-                    <Text style={styles.tipTitle}>Add tip</Text>
+                    <Text style={styles.tipTitle}>Tiền tip</Text>
                     <View style={styles.tipOptions}>
-                        {[2, 5, 10].map((option) => (
+                        {[2000, 5000, 10000].map((option) => (
                             <TouchableOpacity
                                 key={option}
                                 style={[styles.tipButton, tip === option && styles.selectedTipButton]}
                                 onPress={() => setTip(option)}
                             >
-                                <Text style={styles.tipText}>{option}$</Text>
+                                <Text style={styles.tipText}>{formatCurrency(option)}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -127,37 +192,50 @@ const Payment = ({ navigation }: { navigation: any }) => {
                     {/* Total and Submit */}
                     <View style={styles.totalSection}>
                         <View style={styles.totalRow}>
-                            <Text>Sub total:</Text>
-                            <Text>9$</Text>
-                        </View>
-                        <View style={styles.totalRow}>
-                            <Text>Gst:</Text>
-                            <Text>1.17$</Text>
+                            <Text>Tổng tiền:</Text>
+                            <Text>{formatCurrency(totalSum)}</Text>
                         </View>
                         <View style={styles.totalRow}>
                             <Text>Tip:</Text>
-                            <Text>{tip}$</Text>
+                            <Text>{formatCurrency(tip)}</Text>
                         </View>
                         <View style={styles.totalRow}>
-                            <Text style={styles.totalAmountText}>Total:</Text>
-                            <Text style={styles.totalAmountText}>11.07$</Text>
+                            <Text style={styles.totalAmountText}>Thành tiền:</Text>
+                            <Text style={styles.totalAmountText}>{formatCurrency(totalMoney)}</Text>
                         </View>
 
                         {/* Payment Method */}
-                        <Text style={styles.paymentTitle}>Select payment</Text>
+                        <Text style={styles.paymentTitle}>Chọn phương thức thanh toán</Text>
                         <View style={styles.paymentMethods}>
-                            <RadioGroup
-                                radioButtons={radioButtons}
-                                onPress={setSelectedId}
-                                selectedId={selectedId}
-                                layout='row'
-                            />
+                            {radioButtons.map((item) => (
+                                <RadioButton
+                                    key={item.id}
+                                    id={item.id}
+                                    label={item.label}
+                                    value={item.value}
+                                    selected={paymentMethod === item.value} // Control selected state
+                                    onPress={() => handleSetPayment(item)} // Update state on press
+                                />
+                            ))}
                         </View>
+                        {Platform.OS !== 'web' && paypalUrl && (
+                            <Modal visible={!!paypalUrl}>
+                                <TouchableOpacity onPress={clearPaypalState} style={{ margin: 24 }}>
+                                    <Text style={{fontSize: 20}}>Close</Text>
+                                </TouchableOpacity>
+                                <View style={{ flex: 1 }}>
+                                    <WebView
+                                        source={{ uri: paypalUrl }}
+                                        onNavigationStateChange={onChangeUrl}
+                                    />
+                                </View>
+                            </Modal>
+                        )}
                     </View>
 
                 </ScrollView>
-                <TouchableOpacity style={styles.submitButton} onPress={() => navigation.navigate('Success')}>
-                    <Text style={styles.submitButtonText}>Pay & Submit 11.07$</Text>
+                <TouchableOpacity style={styles.submitButton} onPress={handlePayment}>
+                    <Text style={styles.submitButtonText}>Thanh toán {formatCurrency(totalMoney)}</Text>
                 </TouchableOpacity>
             </View>
         </>

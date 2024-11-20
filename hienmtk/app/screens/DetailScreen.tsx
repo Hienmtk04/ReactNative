@@ -1,48 +1,118 @@
 import { Dimensions, StatusBar, StyleSheet, Text, View } from 'react-native'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Image, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Dropdown } from 'react-native-element-dropdown';
-const DetailScreen = ({ navigation }: { navigation: any }) => {
-  const amountMilk = [
-    { label: '2% dairy milk', value: 'less' },
-    { label: 'Nonfat milk', value: 'enough' },
-    { label: 'Oat beverage', value: 'much' },
-    { label: 'Almond beverage', value: 'very much' },
+import { ADDCART, GET_IMG } from '../api/apiService';
+import InputSpinner from 'react-native-input-spinner';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
-  ];
-  const espressoShot = [
-    { label: 'Double', value: 'double' },
-    { label: 'Quad', value: 'quad' },
-    { label: 'Single Shot', value: 'single' },
+const addToCart = async (newProduct) => {
+  try {
+    const cart = await AsyncStorage.getItem('cart');
+    const cartItems = cart ? JSON.parse(cart) : [];
+    console.log("Current cart:", cartItems);
 
-  ];
-  const topping = [
-    { label: 'Cinnamon', value: 'cinnamon' },
-    { label: 'Cheese Cream', value: 'cream' },
-    { label: 'Pudding', value: 'pudding' },
+    const existingProductIndex = cartItems.findIndex(
+      (item) => item.productId === newProduct.productId 
+    );
 
-  ];
+    if (existingProductIndex !== -1) {
+      cartItems[existingProductIndex].quantity += newProduct.quantity;
+      cartItems[existingProductIndex].total = cartItems[existingProductIndex].quantity * cartItems[existingProductIndex].specialPrice;
+      cartItems[existingProductIndex].totalPrice = cartItems[existingProductIndex].total;
+    } else {
+      cartItems.push(newProduct); 
+    }
+    await AsyncStorage.setItem('cart', JSON.stringify(cartItems));
+
+  } catch (error) {
+    console.error("Error adding to cart", error);
+  }
+};
+
+
+const DetailScreen = ({ navigation, route }: any) => {
+
   const [value, setValue] = useState('');
-  const [milkValue, setMilkValue] = useState('');
-  const [espressoValue, setEspressoValue] = useState('');
-  const [toppingValue, setToppingValue] = useState('');
   const [isFocus, setIsFocus] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
-  const [selectedSize, setSelectedSize] = useState('small');
+  const [selectedSize, setSelectedSize] = useState('');
+  const cartId = AsyncStorage.getItem('cartId');
+
+  const [products, setProducts] = useState([]);
+
+
+  useEffect(() => {
+    const loadCart = async () => {
+      try {
+        const storedCart = await AsyncStorage.getItem('cart')
+        if (storedCart) {
+          setProducts(JSON.parse(storedCart))
+        }
+      } catch (error) {
+        console.error('Error loading cart data from AsyncStorage', error)
+      }
+    }
+    loadCart()
+  }, [])
+
+  const { product } = route.params;
+  if (!product) {
+    return <Text>Product not found!</Text>;
+  }
+  const [total, totalPrice] = useState(product.discount > 0 ? product.specialPrice : product.price);
+  const [quantity, setQuantity] = useState(1);
 
   const handleSizeSelect = (size: string) => {
     setSelectedSize(size);
   };
+  console.log("Selected Size: ", selectedSize);
 
+  const handleAddToCart = async () => {
+    if (!product) {
+      console.error("Product not found");
+      return;
+    }
 
-  const handleAddToCart = () => {
-    setShowNotification(true);
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 3000);
+    try {
+      const cartId = await AsyncStorage.getItem('cartId');
+      if (!cartId) {
+        console.error("Cart ID not found in AsyncStorage");
+        return;
+      }
+
+      const updatedProduct = {
+        ...product,
+        quantity,
+        selectedSize,
+        totalPrice: (product.discount > 0 ? product.specialPrice : product.price) * quantity,
+      };
+
+      console.log("Product Update: ", updatedProduct);
+
+      const response = await ADDCART(cartId, updatedProduct.productId, updatedProduct.quantity);
+      if (response) {
+        console.log("Product added to database cart successfully", response.data);
+
+        await addToCart(updatedProduct);
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 2000);
+        navigation.navigate('Cart');
+      }
+    } catch (error) {
+      console.error("Error adding product to cart:", error);
+    }
+  };
+
+  const formatCurrency = (price) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(price);
   };
 
 
@@ -59,7 +129,7 @@ const DetailScreen = ({ navigation }: { navigation: any }) => {
         {/* Header Section */}
         <View style={styles.header_bottom}>
           <View style={styles.header_option1}>
-            <Image source={require('../../assets/images/banner/Logo 1.png')} style={styles.logo} />
+            <Image source={require('../../assets/images/banner/Logo 1.png')} style={styles.logo} resizeMode='contain' />
           </View>
           <View style={styles.header_option2}>
             <FontAwesome name="search" size={20} color="background: #9A7D60" style={styles.header_icon} />
@@ -72,106 +142,55 @@ const DetailScreen = ({ navigation }: { navigation: any }) => {
         </TouchableOpacity>
 
         <View style={styles.detail_img}>
-          <Image source={require('../../assets/images/product/Group 1190 (1).png')} style={styles.img} />
-          <Text style={styles.detail_name}>Espresso</Text>
+          <Image source={{ uri: GET_IMG("products/image", product.image) }} style={styles.img} resizeMode='contain' />
+          <Text style={styles.detail_name}>{product.productName}   </Text>
+          <Text>{product.description}   </Text>
         </View>
 
         <View style={styles.detail}>
           <Text style={{ color: '#591904', fontSize: 15, fontWeight: 600 }}>Size</Text>
         </View>
         <View style={styles.option_type}>
-          <TouchableOpacity onPress={() => handleSizeSelect('small')}>
-            <Image source={selectedSize === 'small' ? require('../../assets/images/icon/Group 1229.png') : require('../../assets/images/icon/Group 1237.png')} style={styles.detail_order_img} />
+          <TouchableOpacity onPress={() => handleSizeSelect('S')}>
+            <Image source={selectedSize === 'S' ? require('../../assets/images/icon/Group 1229.png') : require('../../assets/images/icon/Group 1237.png')} style={styles.detail_order_img} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleSizeSelect('medium')}>
-            <Image source={selectedSize === 'medium' ? require('../../assets/images/icon/Group 1233.png') : require('../../assets/images/icon/Group 1236.png')} style={styles.detail_order_img} />
+          <TouchableOpacity onPress={() => handleSizeSelect('M')}>
+            <Image source={selectedSize === 'M' ? require('../../assets/images/icon/Group 1233.png') : require('../../assets/images/icon/Group 1236.png')} style={styles.detail_order_img} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleSizeSelect('large')}>
-            <Image source={selectedSize === 'large' ? require('../../assets/images/icon/Group 1235.png') : require('../../assets/images/icon/Group 1234.png')} style={styles.detail_order_img} />
+          <TouchableOpacity onPress={() => handleSizeSelect('L')}>
+            <Image source={selectedSize === 'L' ? require('../../assets/images/icon/Group 1235.png') : require('../../assets/images/icon/Group 1234.png')} style={styles.detail_order_img} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.detail}>
-          <Text style={{ color: '#591904', fontSize: 15, fontWeight: 600 }}>What's included?</Text>
+        <View style={{ justifyContent: 'center', alignItems: 'center', marginVertical: 15 }}>
+          <InputSpinner
+            max={10}
+            min={1}
+            step={1}
+            skin={"round"}
+            color={'#FFF'}
+            value={0}
+            height={40}
+            width={150}
+            shadow={false}
+            background={'#FFF'}
+            showBorder={false}
+            onChange={(num) => {
+              product.total = num * (product.discount > 0 ? product.specialPrice : product.price);
+              totalPrice(product.total);
+              setQuantity(num);
+            }}
+          />
         </View>
-        <View style={styles.option}>
-          <View style={styles.include}>
-            {renderLabel()}
-            <Dropdown
-              style={[styles.dropdown]}
-              placeholderStyle={styles.placeholderStyle}
-              selectedTextStyle={styles.selectedTextStyle}
-              inputSearchStyle={styles.inputSearchStyle}
-              iconStyle={styles.iconStyle}
-              data={amountMilk}
-              maxHeight={300}
-              labelField="label"
-              valueField="value"
-              placeholder={!isFocus ? 'Select one' : ''}
-              value={milkValue}
-              onFocus={() => setIsFocus(true)}
-              onBlur={() => setIsFocus(false)}
-              onChange={item => {
-                setMilkValue(item.value);
-                setIsFocus(false);
-              }}
-            />
-            <Text style={styles.option_label}>Milk</Text>
-          </View>
 
-          <View style={styles.include}>
-            {renderLabel()}
-            <Dropdown
-              style={[styles.dropdown]}
-              placeholderStyle={styles.placeholderStyle}
-              selectedTextStyle={styles.selectedTextStyle}
-              inputSearchStyle={styles.inputSearchStyle}
-              iconStyle={styles.iconStyle}
-              data={espressoShot}
-              maxHeight={300}
-              labelField="label"
-              valueField="value"
-              placeholder={!isFocus ? 'Select one' : ''}
-              value={espressoValue}
-              onFocus={() => setIsFocus(true)}
-              onBlur={() => setIsFocus(false)}
-              onChange={item => {
-                setEspressoValue(item.value);
-                setIsFocus(false);
-              }}
-            />
-            <Text style={styles.option_label}>Espresso</Text>
-          </View>
-
-          <View style={styles.include}>
-            {renderLabel()}
-            <Dropdown
-              style={[styles.dropdown]}
-              placeholderStyle={styles.placeholderStyle}
-              selectedTextStyle={styles.selectedTextStyle}
-              inputSearchStyle={styles.inputSearchStyle}
-              iconStyle={styles.iconStyle}
-              data={topping}
-              maxHeight={300}
-              labelField="label"
-              valueField="value"
-              placeholder={!isFocus ? 'Select one' : ''}
-              value={toppingValue}
-              onFocus={() => setIsFocus(true)}
-              onBlur={() => setIsFocus(false)}
-              onChange={item => {
-                setToppingValue(item.value);
-                setIsFocus(false);
-              }}
-            />
-            <Text style={styles.option_label}>Topping</Text>
-          </View>
-        </View>
       </ScrollView>
       <View style={styles.add_to_cart}>
-        <TouchableOpacity style={styles.add_to_cart_btn} onPress={handleAddToCart}>
-          <Text style={styles.txt_add_to_cart}> Add to cart</Text>
-          <Text style={styles.txt_total}> $5 </Text>
+        <TouchableOpacity
+          style={styles.add_to_cart_btn}
+          onPress={handleAddToCart}
+        >
+          <Text style={styles.txt_add_to_cart}> Thêm vào giỏ</Text>
+          <Text style={styles.txt_total}>{formatCurrency(total)} </Text>
         </TouchableOpacity>
       </View>
       {showNotification && (
@@ -188,7 +207,9 @@ const DetailScreen = ({ navigation }: { navigation: any }) => {
             <Image source={require('../../assets/images/banner/Vector.png')} style={styles.icon} />
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.navButton} onPress={() => navigation.navigate('Cart')} >
+        <TouchableOpacity style={styles.navButton} onPress={() => {
+          navigation.navigate('Cart');
+        }}>
           <Image source={require('../../assets/images/banner/Vector (1).png')} style={styles.icon} />
         </TouchableOpacity>
       </View>

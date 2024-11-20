@@ -11,9 +11,9 @@ import AboutUs from './hometabs/AboutUs';
 
 const Tab = createBottomTabNavigator();
 
-const HomeScreen = ({ navigation }: { navigation: any }) => {
+const HomeScreen = ({ navigation, route }:any ) => {
 
-
+    const { username } = route.params || {};    
     return (
         <>
             <Tab.Navigator
@@ -26,8 +26,9 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
                 <Tab.Screen
                     name="Feed"
                     component={Feed}
+                    initialParams={{ username }}    
                     options={{
-                        tabBarLabel: 'Home',
+                        tabBarLabel: 'Trang chủ',
                         tabBarIcon: ({ color, size }) => (
                             <MaterialCommunityIcons name="home" color={color} size={size} />
                         ),
@@ -38,7 +39,7 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
                     name="Order"
                     component={Order}
                     options={{
-                        tabBarLabel: 'Order',
+                        tabBarLabel: 'Thực đơn',
                         tabBarIcon: ({ color, size }) => (
                             <MaterialCommunityIcons name="food-fork-drink" size={24} color={color} />
                         ),
@@ -48,7 +49,7 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
                     name="AboutUs"
                     component={AboutUs}
                     options={{
-                        tabBarLabel: 'AboutUs',
+                        tabBarLabel: 'Về chúng tôi',
                         tabBarIcon: ({ color, size }) => (
                             <AntDesign name="tag" size={24} color={color} />
                         ),
@@ -58,7 +59,7 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
                     name="Profile"
                     component={Profile}
                     options={{
-                        tabBarLabel: 'Profile',
+                        tabBarLabel: 'Cá nhân',
                         tabBarIcon: ({ color, size }) => (
                             <MaterialCommunityIcons name="account" size={24} color={color} />
                         ),

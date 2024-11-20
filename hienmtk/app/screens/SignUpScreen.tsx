@@ -1,8 +1,58 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
 import { AntDesign, FontAwesome } from '@expo/vector-icons';
+import { REGISTER } from '../api/apiService';
+import { useNavigation } from 'expo-router';
+import { useToast } from 'react-native-toast-notifications';
 
 const SignUpScreen = ({ navigation }: { navigation: any }) => {
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [pass, setPass] = useState('');
+    const [mobileNumber, setMobileNumber] = useState('');
+    const [email, setEmail] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const navigate = useNavigation();
+    const [errorMessage, setErrorMessage] = useState('');
+
+    const toast = useToast();
+
+    const showToast = () => {
+        toast.show('Đăng ký thành công!', {
+            type: 'success',
+            duration: 3000,
+            animationType: 'slide-in',
+            placement: 'top'
+        });
+    };
+
+
+
+    const handleRegister = async (event: any) => {
+
+        const formData = {
+            firstName,
+            lastName,
+            email,
+            password: pass,
+            mobileNumber,
+        };
+        event.preventDefault();
+        try {
+            if (firstName.length < 5 || lastName.length < 5) {
+                setErrorMessage("Tên phải ít nhất 5 ký tự")
+            }
+            if (!firstName || !lastName||!email||!mobileNumber||!pass) {
+                setErrorMessage("Vui lòng điền đầy đủ thông tin")
+            }
+            const response = await REGISTER(formData, navigation);
+            if (response && response.data) {
+                showToast();
+            }
+        } catch (error) {
+            window.alert('Register failed');
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -14,28 +64,43 @@ const SignUpScreen = ({ navigation }: { navigation: any }) => {
 
             <Text style={styles.welcomeText}>Welcome back!</Text>
             <Text style={styles.subText}> Come and enjoy with us</Text>
-            
 
-            <TextInput style={styles.input} placeholder="User Name" />
-            <TextInput style={styles.input} placeholder="Email" />
-            <TextInput style={styles.input} placeholder="Phone" />
-            <TextInput style={styles.input} placeholder="Address" />
+            {
+                errorMessage &&
+                <Text style={{ padding: 10, marginBottom: 10, fontSize: 15, fontWeight: 600 }}>{errorMessage}</Text>
+            }
 
 
+            <TextInput style={styles.input} placeholder="First Name"
+                value={firstName}
+                onChangeText={setFirstName} />
+            <TextInput style={styles.input} placeholder="Last Name"
+                value={lastName}
+                onChangeText={setLastName} />
+            <TextInput style={styles.input} placeholder="Email"
+                value={email}
+                onChangeText={setEmail} />
+            <TextInput style={styles.input} placeholder="Phone"
+                value={mobileNumber}
+                onChangeText={setMobileNumber} />
             <View style={styles.passwordContainer}>
                 <TextInput
                     style={styles.input}
                     placeholder="Password"
+                    value={pass}
+                    onChangeText={setPass}
+                    secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity
                     style={styles.eyeIcon}
+                    onPress={() => setShowPassword(prevState => !prevState)}
                 >
-                    <FontAwesome name={"eye"} size={24} color="black" />
+                    <FontAwesome name={showPassword ? "eye-slash" : "eye"} size={24} color="black" />
                 </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.loginButton}>
-                <Text style={styles.loginButtonText} onPress={() => navigation.navigate('Home')}>Sign Up</Text>
+            <TouchableOpacity style={styles.loginButton} onPress={handleRegister}>
+                <Text style={styles.loginButtonText}>Sign Up</Text>
             </TouchableOpacity>
 
             <View style={styles.signUpContainer}>

@@ -2,26 +2,26 @@ import { Dimensions, StatusBar, StyleSheet, Text, View } from 'react-native'
 import React from 'react'
 import { SceneMap, TabBar, TabView } from 'react-native-tab-view';
 import MenuOder from './Ordertab/OrderMain';
-import SavedItem from './Ordertab/SavedOrder';
-import RecentItem from './Ordertab/Recent';
 import { Image, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import NewItem from './Ordertab/NewItem';
+import SaleItem from './Ordertab/Sale';
 
 export default class Order extends React.Component {
     state = {
         index: 0,
         routes: [
             { key: 'menu', title: 'Menu' },
-            { key: 'saved', title: 'Saved' },
-            { key: 'recent', title: 'Recent' },
+            { key: 'new', title: 'New' },
+            { key: 'sale', title: 'Sale' },
         ],
     };
 
     renderScene = SceneMap({
         menu: () => <MenuOder navigation={this.props.navigation} />,
-        saved: SavedItem,
-        recent: RecentItem,
+        new: NewItem,
+        sale: SaleItem,
     });
     render() {
         return (
@@ -39,7 +39,7 @@ export default class Order extends React.Component {
                     </View>
                     <View style={styles.title}>
                     
-                        <Text style={styles.textTitle}>Order</Text>
+                        <Text style={styles.textTitle}>Thực đơn</Text>
                     </View>
                     <TabView
                         navigationState={this.state}
